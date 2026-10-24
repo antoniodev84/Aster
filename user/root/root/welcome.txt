@@ -1,0 +1,7 @@
+Aster
+
+This system runs original kernel and userspace code.
+Each command in /bin is a separate static ELF64 executable.
+Use help to list commands and shell syntax.
+Use edit FILE for the full-screen editor. Ctrl-S saves; Ctrl-Q quits.
+The root filesystem is ext2 when a supported AHCI disk is attached.

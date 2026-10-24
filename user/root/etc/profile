@@ -1,0 +1,4 @@
+PATH=/bin:/sbin
+HOME=/root
+TERM=ansi
+export PATH HOME TERM
