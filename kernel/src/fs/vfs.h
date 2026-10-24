@@ -57,7 +57,9 @@ struct pipe {
     unsigned readers, writers;
 };
 
+struct net_socket;
 struct open_file {
+    struct net_socket *socket;
     unsigned references, flags;
     uint64_t offset;
     struct vnode *node;

@@ -320,6 +320,27 @@ char *strerror(int e) {
         return "Too many symbolic links";
     case EOVERFLOW:
         return "Value too large";
+    case ENOTSOCK: return "Socket operation on non-socket";
+    case EDESTADDRREQ: return "Destination address required";
+    case EMSGSIZE: return "Message too long";
+    case EPROTOTYPE: return "Wrong socket protocol type";
+    case ENOPROTOOPT: return "Protocol option unavailable";
+    case EPROTONOSUPPORT: return "Protocol not supported";
+    case EAFNOSUPPORT: return "Address family not supported";
+    case EADDRINUSE: return "Address already in use";
+    case EADDRNOTAVAIL: return "Address not available";
+    case ENETDOWN: return "Network is down";
+    case ENETUNREACH: return "Network is unreachable";
+    case ECONNABORTED: return "Connection aborted";
+    case ECONNRESET: return "Connection reset by peer";
+    case ENOBUFS: return "No buffer space available";
+    case EISCONN: return "Socket is already connected";
+    case ENOTCONN: return "Socket is not connected";
+    case ETIMEDOUT: return "Connection timed out";
+    case ECONNREFUSED: return "Connection refused";
+    case EHOSTUNREACH: return "Host is unreachable";
+    case EALREADY: return "Operation already in progress";
+    case EINPROGRESS: return "Operation in progress";
     case ENOTSUP:
         return "Operation not supported";
     default:

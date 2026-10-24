@@ -12,9 +12,11 @@
 #define BLOCK_IO 1
 #define BLOCK_WAIT 2
 #define BLOCK_SLEEP 3
+#define BLOCK_NET 4
 #define SYSCALL_BLOCK (-4096l)
 
 struct process {
+    uint64_t net_deadline, net_operation;
     int pid, ppid, pgrp, sid, state, wait_status, block_reason;
     uint32_t uid, euid, suid, gid, egid, sgid, umask;
     char name[64], executable[PATH_MAX];

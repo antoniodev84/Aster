@@ -1,3 +1,4 @@
+#include "net/net.h"
 #include "process.h"
 #include "console/kprintf.h"
 #include "drivers/tty.h"
@@ -325,6 +326,7 @@ void process_signal(struct process *p, int signal) {
                 struct abi_timespec value = {remaining / 1000000000, remaining % 1000000000};
                 copy_to_user(p->space, p->sleep_remaining, &value, sizeof(value));
             }
+            p->net_deadline = p->net_operation = 0;
             p->frame->rax = -EINTR;
         }
     }
@@ -511,6 +513,8 @@ struct x64_frame *process_interrupt(struct x64_frame *frame) {
     x64_apic_dispatch((uint8_t)frame->vector);
     if (frame->vector == 48) {
         tty_poll();
+        if (active && ((frame->cs & 3) == 3 || current == idle))
+            net_poll();
         if (active && ((frame->cs & 3) == 3 || current == idle)) {
             if (current != idle)
                 current->user_ticks++;

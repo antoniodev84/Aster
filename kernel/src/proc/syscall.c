@@ -1,3 +1,4 @@
+#include "net/net.h"
 #include "process.h"
 #include "drivers/tty.h"
 #include "kstring.h"
@@ -40,7 +41,7 @@ static long open_path(int dirfd, uint64_t path_u, unsigned flags, uint32_t mode)
         struct open_file *directory = get_file(dirfd);
         if (!directory)
             return -EBADF;
-        if (directory->pipe || !S_ISDIR(directory->node->mode))
+        if (!directory->node || directory->pipe || !S_ISDIR(directory->node->mode))
             return -ENOTDIR;
         base = directory->node;
     }
@@ -91,6 +92,8 @@ static long io_file(int fd, uint64_t pointer, size_t count, bool write) {
         return -EFAULT;
     if (!count)
         return 0;
+    if (file->socket)
+        return net_syscall(write ? SYS_sendto : SYS_recvfrom, fd, pointer, count, 0, 0, 0);
     uint8_t *buffer = kmalloc(PAGE_SIZE);
     if (!buffer)
         return -ENOMEM;
@@ -244,7 +247,7 @@ static long memory_map(uint64_t address, size_t length, unsigned protection, uns
         file = get_file(fd);
         if (!file)
             return -EBADF;
-        if (file->pipe || !S_ISREG(file->node->mode))
+        if (!file->node || file->pipe || !S_ISREG(file->node->mode))
             return -ENODEV;
         if ((file->flags & 3) == O_WRONLY)
             return -EACCES;
@@ -550,6 +553,11 @@ static long sys_dispatch(struct x64_frame *f) {
     struct process *p = process_current();
     uint64_t a = f->rdi, b = f->rsi, c = f->rdx, d = f->r10, e = f->r8, g = f->r9;
     switch (f->rax) {
+    case SYS_socket: case SYS_connect: case SYS_accept: case SYS_sendto:
+    case SYS_recvfrom: case SYS_shutdown: case SYS_bind: case SYS_listen:
+    case SYS_getsockname: case SYS_getpeername: case SYS_setsockopt:
+    case SYS_getsockopt: case SYS_netconfig: case SYS_resolve: case SYS_dhcp:
+        return net_syscall(f->rax, a, b, c, d, e, g);
     case SYS_read:
         return io_file(a, b, c, false);
     case SYS_write:
@@ -573,9 +581,9 @@ static long sys_dispatch(struct x64_frame *f) {
         if (!file)
             return -EBADF;
         struct abi_stat stat;
-        if (file->pipe) {
+        if (file->pipe || file->socket) {
             memset(&stat, 0, sizeof(stat));
-            stat.st_mode = S_IFIFO | 0600;
+            stat.st_mode = (file->socket ? S_IFSOCK : S_IFIFO) | 0600;
             stat.st_nlink = 1;
             stat.st_blksize = 4096;
         } else
@@ -588,7 +596,7 @@ static long sys_dispatch(struct x64_frame *f) {
         struct open_file *file = get_file(a);
         if (!file)
             return -EBADF;
-        if (file->pipe || S_ISCHR(file->node->mode))
+        if (!file->node || file->pipe || S_ISCHR(file->node->mode))
             return -ESPIPE;
         int64_t offset = b, base = c == SEEK_SET   ? 0
                                    : c == SEEK_CUR ? file->offset
@@ -655,13 +663,13 @@ static long sys_dispatch(struct x64_frame *f) {
             return -EBADF;
         if (file->pipe)
             return -EINVAL;
-        return file_cache_flush(file->node);
+        return file->socket ? -EINVAL : file_cache_flush(file->node);
     }
     case SYS_ftruncate: {
         struct open_file *file = get_file(a);
         if (!file)
             return -EBADF;
-        if (file->pipe || !S_ISREG(file->node->mode))
+        if (!file->node || file->pipe || !S_ISREG(file->node->mode))
             return -EINVAL;
         if ((file->flags & 3) == O_RDONLY)
             return -EBADF;
@@ -733,7 +741,7 @@ static long sys_dispatch(struct x64_frame *f) {
         struct open_file *file = get_file(a);
         if (!file)
             return -EBADF;
-        if (file->pipe || !S_ISDIR(file->node->mode))
+        if (!file->node || file->pipe || !S_ISDIR(file->node->mode))
             return -ENOTDIR;
         long result = vfs_access(file->node, 1);
         if (result < 0)

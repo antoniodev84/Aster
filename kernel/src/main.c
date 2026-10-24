@@ -12,6 +12,7 @@
 #include "drivers/block.h"
 #include "drivers/tty.h"
 #include "fs/vfs.h"
+#include "net/net.h"
 
 __attribute__((used, section(".limine_requests"))) static volatile uint64_t limine_base_revision[] =
     LIMINE_BASE_REVISION(6);
@@ -135,6 +136,7 @@ void kmain(void) {
     size_t devices = pci_enumerate(print_pci, NULL);
     kprintf("[pci] devices=%llu segment=0 config=CF8/CFC\n", (unsigned long long)devices);
     ahci_init();
+    net_init();
     if (!module_request.response || !module_request.response->module_count)
         hal_panic("initrd module missing");
     struct limine_file *initrd = module_request.response->modules[0];

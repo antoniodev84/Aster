@@ -9,6 +9,8 @@ ARCH := x86_64
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
 QEMUFLAGS := -m 512M -vga std -serial stdio
+NET_DEVICE ?= e1000
+NET_FLAGS ?= -netdev user,id=net0 -device $(NET_DEVICE),netdev=net0
 DISK_IMAGE := rootfs.img
 DISK_SIZE := 128M
 MKE2FS := mke2fs
@@ -88,7 +90,7 @@ run: edk2-ovmf-bins $(IMAGE_NAME).iso $(DISK_IMAGE)
 		-cdrom $(IMAGE_NAME).iso \
 		-drive if=none,id=osroot,format=raw,file=$(DISK_IMAGE) \
 		-device ide-hd,drive=osroot,bus=ide.0 \
-		$(QEMUFLAGS)
+		$(QEMUFLAGS) $(NET_FLAGS)
 
 .PHONY: run-hdd
 run-hdd: edk2-ovmf-bins $(IMAGE_NAME).hdd $(DISK_IMAGE)
@@ -99,7 +101,7 @@ run-hdd: edk2-ovmf-bins $(IMAGE_NAME).hdd $(DISK_IMAGE)
 		-device ide-hd,drive=bootdisk,bus=ide.1,bootindex=1 \
 		-drive if=none,id=osroot,format=raw,file=$(DISK_IMAGE) \
 		-device ide-hd,drive=osroot,bus=ide.0 \
-		$(QEMUFLAGS)
+		$(QEMUFLAGS) $(NET_FLAGS)
 
 ifeq ($(ARCH),x86_64)
 .PHONY: run-bios
@@ -110,7 +112,7 @@ run-bios: $(IMAGE_NAME).iso $(DISK_IMAGE)
 		-drive if=none,id=osroot,format=raw,file=$(DISK_IMAGE) \
 		-device ide-hd,drive=osroot,bus=ide.0 \
 		-boot d \
-		$(QEMUFLAGS)
+		$(QEMUFLAGS) $(NET_FLAGS)
 
 .PHONY: run-hdd-bios
 run-hdd-bios: $(IMAGE_NAME).hdd $(DISK_IMAGE)
@@ -120,7 +122,7 @@ run-hdd-bios: $(IMAGE_NAME).hdd $(DISK_IMAGE)
 		-device ide-hd,drive=bootdisk,bus=ide.1,bootindex=1 \
 		-drive if=none,id=osroot,format=raw,file=$(DISK_IMAGE) \
 		-device ide-hd,drive=osroot,bus=ide.0 \
-		$(QEMUFLAGS)
+		$(QEMUFLAGS) $(NET_FLAGS)
 endif
 
 $(DISK_IMAGE):

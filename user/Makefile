@@ -9,7 +9,7 @@ COMMANDSRC := $(wildcard commands/*.c)
 COMMANDS := $(patsubst commands/%.c,root/bin/%,$(COMMANDSRC))
 .PHONY: all clean
 all: root/sbin/init root/bin/sh $(COMMANDS) initrd.tar
-build/libc/%.o: libc/src/%.c $(wildcard libc/include/*.h libc/include/sys/*.h) ../include/abi.h
+build/libc/%.o: libc/src/%.c $(shell find libc/include -type f -name '*.h') ../include/abi.h
 	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 build/libc/start.o: libc/src/start.S

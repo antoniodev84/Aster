@@ -1,3 +1,4 @@
+#include "net/net.h"
 #include "vfs.h"
 #include "mm/mm.h"
 #include "kstring.h"
@@ -706,6 +707,8 @@ long file_release(struct open_file *f) {
     if (!f || --f->references)
         return 0;
     long result = 0;
+    if (f->socket)
+        net_close(f->socket);
     if (f->pipe) {
         if (f->pipe_writer)
             f->pipe->writers--;
@@ -723,6 +726,8 @@ long file_release(struct open_file *f) {
     return result;
 }
 long file_read(struct open_file *f, void *b, size_t count) {
+    if (f->socket)
+        return net_read(f->socket, b, count);
     if ((f->flags & 3) == O_WRONLY)
         return -EBADF;
     if (!count)
@@ -749,6 +754,8 @@ long file_read(struct open_file *f, void *b, size_t count) {
     return result;
 }
 long file_write(struct open_file *f, const void *b, size_t count) {
+    if (f->socket)
+        return net_write(f->socket, b, count);
     if ((f->flags & 3) == O_RDONLY)
         return -EBADF;
     if (!count)
@@ -779,7 +786,7 @@ long file_write(struct open_file *f, const void *b, size_t count) {
     return result;
 }
 long file_getdents(struct open_file *f, void *buffer, size_t count) {
-    if (f->pipe || !S_ISDIR(f->node->mode))
+    if (!f->node || f->pipe || !S_ISDIR(f->node->mode))
         return -ENOTDIR;
     size_t used = 0;
     while (used < count) {

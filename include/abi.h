@@ -299,4 +299,77 @@ struct abi_utsname {
     char sysname[65], nodename[65], release[65], version[65], machine[65], domainname[65];
 };
 
+#define SYS_socket 41
+#define SYS_connect 42
+#define SYS_accept 43
+#define SYS_sendto 44
+#define SYS_recvfrom 45
+#define SYS_shutdown 48
+#define SYS_bind 49
+#define SYS_listen 50
+#define SYS_getsockname 51
+#define SYS_getpeername 52
+#define SYS_setsockopt 54
+#define SYS_getsockopt 55
+#define SYS_netconfig 450
+#define SYS_resolve 451
+#define SYS_dhcp 452
+#define AF_INET 2
+#define SOCK_STREAM 1
+#define SOCK_DGRAM 2
+#define SOCK_RAW 3
+#define SOCK_NONBLOCK O_NONBLOCK
+#define SOCK_CLOEXEC O_CLOEXEC
+#define IPPROTO_ICMP 1
+#define IPPROTO_TCP 6
+#define IPPROTO_UDP 17
+#define SOL_SOCKET 1
+#define SO_REUSEADDR 2
+#define SO_ERROR 4
+#define SO_BROADCAST 6
+#define SO_RCVTIMEO 20
+#define SO_SNDTIMEO 21
+#define MSG_PEEK 2
+#define MSG_DONTWAIT 64
+#define MSG_NOSIGNAL 16384
+#define SHUT_RD 0
+#define SHUT_WR 1
+#define SHUT_RDWR 2
+#define EDESTADDRREQ 89
+#define EMSGSIZE 90
+#define EPROTOTYPE 91
+#define ENOPROTOOPT 92
+#define EPROTONOSUPPORT 93
+#define EAFNOSUPPORT 97
+#define EADDRINUSE 98
+#define EADDRNOTAVAIL 99
+#define ENETDOWN 100
+#define ENETUNREACH 101
+#define ECONNABORTED 103
+#define ECONNRESET 104
+#define ENOBUFS 105
+#define EISCONN 106
+#define ENOTCONN 107
+#define ETIMEDOUT 110
+#define ECONNREFUSED 111
+#define EHOSTUNREACH 113
+#define EALREADY 114
+#define EINPROGRESS 115
+#define ENOTSOCK 88
+#define S_IFSOCK 0140000
+struct abi_sockaddr_in {
+    uint16_t family, port;
+    uint32_t address;
+    uint8_t zero[8];
+};
+struct abi_netconfig {
+    uint32_t index, flags, address, netmask, gateway, dns;
+    uint8_t mac[6];
+    uint16_t mtu;
+    char name[16];
+};
+#define NETCFG_UP 1
+#define NETCFG_LINK 2
+#define NETCFG_DHCP 4
+#define NETCFG_DEFAULT 8
 #endif

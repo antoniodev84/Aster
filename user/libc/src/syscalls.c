@@ -1,4 +1,5 @@
 #include <os.h>
+#include <net.h>
 int errno;
 char **environ;
 static long raw(long number, long a, long b, long c, long d, long e, long f) {
@@ -475,4 +476,58 @@ _Noreturn void _exit(int s) {
 }
 _Noreturn void _Exit(int s) {
     _exit(s);
+}
+
+int socket(int domain, int type, int protocol) {
+    return C3(socket, domain, type, protocol);
+}
+int bind(int fd, const struct sockaddr *address, uint32_t length) {
+    return C3(bind, fd, address, length);
+}
+int connect(int fd, const struct sockaddr *address, uint32_t length) {
+    return C3(connect, fd, address, length);
+}
+int listen(int fd, int backlog) {
+    return C2(listen, fd, backlog);
+}
+int accept(int fd, struct sockaddr *address, uint32_t *length) {
+    return C3(accept, fd, address, length);
+}
+ssize_t sendto(int fd, const void *buffer, size_t size, int flags, const struct sockaddr *address,
+               uint32_t length) {
+    return checked(raw(SYS_sendto, fd, (long)buffer, size, flags, (long)address, length));
+}
+ssize_t recvfrom(int fd, void *buffer, size_t size, int flags, struct sockaddr *address,
+                 uint32_t *length) {
+    return checked(raw(SYS_recvfrom, fd, (long)buffer, size, flags, (long)address, (long)length));
+}
+ssize_t send(int fd, const void *buffer, size_t size, int flags) {
+    return sendto(fd, buffer, size, flags, NULL, 0);
+}
+ssize_t recv(int fd, void *buffer, size_t size, int flags) {
+    return recvfrom(fd, buffer, size, flags, NULL, NULL);
+}
+int shutdown(int fd, int how) {
+    return C2(shutdown, fd, how);
+}
+int getsockname(int fd, struct sockaddr *address, uint32_t *length) {
+    return C3(getsockname, fd, address, length);
+}
+int getpeername(int fd, struct sockaddr *address, uint32_t *length) {
+    return C3(getpeername, fd, address, length);
+}
+int setsockopt(int fd, int level, int option, const void *value, uint32_t length) {
+    return checked(raw(SYS_setsockopt, fd, level, option, (long)value, length, 0));
+}
+int getsockopt(int fd, int level, int option, void *value, uint32_t *length) {
+    return checked(raw(SYS_getsockopt, fd, level, option, (long)value, (long)length, 0));
+}
+int netconfig(struct abi_netconfig *config, int set) {
+    return C2(netconfig, config, set);
+}
+int netresolve(const char *name, struct in_addr *address) {
+    return C2(resolve, name, address);
+}
+int netdhcp(unsigned index, unsigned action) {
+    return C2(dhcp, index, action);
 }
