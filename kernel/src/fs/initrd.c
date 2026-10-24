@@ -15,6 +15,26 @@ static bool octal(const char *s, size_t count, uint64_t *value) {
     *value = n;
     return true;
 }
+
+static bool same_content(struct vnode *n, const uint8_t *data, size_t length) {
+    if (n->size != length)
+        return false;
+    size_t done = 0;
+    uint8_t buffer[4096];
+    while (done < length) {
+        size_t chunk = length - done;
+        if (chunk > sizeof(buffer))
+            chunk = sizeof(buffer);
+        long e = vfs_read(n, done, buffer, chunk);
+        if (e != (long)chunk)
+            return false;
+        if (memcmp(buffer, data + done, chunk))
+            return false;
+        done += chunk;
+    }
+    return true;
+}
+
 long initrd_extract(const void *data, size_t size) {
     if (!data || size < 1024)
         return -EINVAL;
@@ -94,7 +114,10 @@ long initrd_extract(const void *data, size_t size) {
             else if (h[156] == '5') {
                 if (!S_ISDIR(existing->mode))
                     return -ENOTDIR;
-                existing->mode = S_IFDIR | (mode & 07777);
+                uint32_t target_mode = S_IFDIR | (mode & 07777);
+                if (existing->mode == target_mode && existing->uid == uid && existing->gid == gid)
+                    goto next_entry;
+                existing->mode = target_mode;
                 existing->uid = uid;
                 existing->gid = gid;
                 e = existing->ops->sync(existing);
@@ -104,15 +127,23 @@ long initrd_extract(const void *data, size_t size) {
                        (!kstrncmp(relative, "bin/", 4) || !kstrncmp(relative, "sbin/", 5))) {
                 if (!S_ISREG(existing->mode))
                     return -EINVAL;
-                e = existing->ops->truncate(existing, 0);
-                if (e < 0)
-                    return e;
-                if (length) {
-                    long written = vfs_write(existing, 0, h + 512, length);
-                    if (written != (long)length)
-                        return written < 0 ? written : -EIO;
+                uint32_t target_mode = S_IFREG | (mode & 07777);
+                bool data_same = same_content(existing, h + 512, length);
+                bool meta_same = existing->mode == target_mode && existing->uid == uid &&
+                                 existing->gid == gid;
+                if (data_same && meta_same)
+                    goto next_entry;
+                if (!data_same) {
+                    e = existing->ops->truncate(existing, 0);
+                    if (e < 0)
+                        return e;
+                    if (length) {
+                        long written = vfs_write(existing, 0, h + 512, length);
+                        if (written != (long)length)
+                            return written < 0 ? written : -EIO;
+                    }
                 }
-                existing->mode = S_IFREG | (mode & 07777);
+                existing->mode = target_mode;
                 existing->uid = uid;
                 existing->gid = gid;
                 e = existing->ops->sync(existing);
@@ -120,6 +151,7 @@ long initrd_extract(const void *data, size_t size) {
                     return e;
             }
         }
+next_entry:
         uint64_t rounded = (length + 511) & ~511ull;
         if (rounded > SIZE_MAX - offset - 512)
             return -EINVAL;
