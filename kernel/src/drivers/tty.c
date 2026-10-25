@@ -54,8 +54,13 @@ static void echo(uint8_t c) {
     }
 }
 static void receive(uint8_t c) {
+    if (c >= 128) {
+        return; 
+    }
+
     if ((attributes.c_iflag & ICRNL) && c == '\r')
         c = '\n';
+
     if (attributes.c_lflag & ISIG) {
         int signal = c == attributes.c_cc[VINTR]   ? SIGINT
                      : c == attributes.c_cc[VQUIT] ? SIGQUIT
@@ -163,6 +168,7 @@ long tty_read(void *buffer, size_t count) {
     if (p && p->pgrp != foreground) {
         process_signal(p, SIGTTIN);
         return -EINTR;
+
     }
     if (!count)
         return 0;

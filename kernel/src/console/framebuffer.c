@@ -56,7 +56,7 @@ static void newline(void) {
 
 static void glyph(unsigned char c) {
     if (c >= 128)
-        c = '?';
+        return;
     size_t x0 = MARGIN + column * GLYPH_WIDTH;
     size_t y0 = MARGIN + row * GLYPH_HEIGHT;
     for (size_t y = 0; y < GLYPH_HEIGHT; y++) {
