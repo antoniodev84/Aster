@@ -13,3 +13,5 @@
 *.img
 *.o
 
+
+/user/root/usr/

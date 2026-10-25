@@ -14,7 +14,7 @@ make run-bios TOOLCHAIN=llvm
 
 The build produces `template-x86_64.iso`, `kernel/bin-x86_64/kernel`, user ELF64 executables, `user/initrd.tar`, and a writable `rootfs.img`. The default VM uses q35 with a SATA disk on AHCI, 512 MiB RAM, a framebuffer and serial console. The first root image is created as ext2 with 256-byte inodes; an existing image is preserved. Override `DISK_IMAGE`, `DISK_SIZE` and `MKE2FS` as needed. `make clean` preserves the root disk.
 
-Boot mounts the first supported ext2 SATA filesystem as `/`. Without one, it uses a volatile RAM root and reports that choice. The initrd populates missing files and refreshes `/bin` and `/sbin` on every boot. Other existing files persist. `/sbin/init` starts and supervises the interactive shell. Commands and logs are in English.
+Boot mounts the first supported ext2 SATA filesystem as `/`. Without one, it uses a volatile RAM root and reports that choice. The initrd populates missing files and refreshes `/bin`, `/sbin`, `/usr/include` and `/usr/lib` on every boot. Other existing files persist. `/sbin/init` starts and supervises the interactive shell. Commands and logs are in English.
 
 ## Kernel
 
@@ -94,3 +94,47 @@ Ext2 supports raw filesystems and MBR Linux partitions with 1/2/4 KiB blocks. It
 Validation uses direct builds and manual VM interaction; no test suite or test scripts are added.
 
 The original network stack was compiled with Clang/LLD and exercised in QEMU with both e1000 and RTL8139. Manual checks covered DHCP acquisition/release, DNS A/CNAME and TCP fallback, ICMP echo, fragmented 8192-byte UDP echo and socket timeouts, and 409600-byte HTTP transfers with matching SHA-256 hashes. Sixteen concurrent HTTP requests succeeded on each driver. A direct Ethernet peer exercised TCP SYN/data retransmission, receive reordering across sequence-number wrap, small/zero windows and persist probes, simultaneous open and orderly close. Short DHCP leases exercised renewal, rebinding and rediscovery after expiry. IPv4 checks exercised reordered/duplicate fragments and rejection of overlaps, invalid final extents and bad checksums. No automated test suite is included. Physical hardware and external Internet ICMP delivery remain unverified.
+
+## Nano C toolchain
+
+The userland includes `ncc`, `nas` and `nld`, built from Nano-Toolchain
+commit `c5372c30d2bb7e09a262eda52cb5d273566e2e1c`.
+Sources and native syscall glue are in `user/nano`.
+No additional third-party library is linked into the userland.
+
+`ncc` searches `/usr/include` and automatically links Aster's own
+`/usr/lib/crt0.o` and `/usr/lib/libc.a`. The installed libc uses fewer ELF
+sections to remain within the kernel's program-header limit.
+
+Inside Aster:
+
+```
+ncc /root/hello.c -o /tmp/hello
+/tmp/hello
+ncc -c /root/hello.c -o /tmp/hello.o
+nld -o /tmp/hello /tmp/hello.o /usr/lib/crt0.o /usr/lib/libc.a
+```
+
+Nano implements a subset of C99. Floating-point types remain unsupported;
+floating-point declarations are hidden from its view of the libc headers.
+The installed stdarg and stddef headers come from Nano. `_Noreturn` and GCC
+format attributes are ignored by this compiler. Multiple constructor arrays
+are rejected by the native linker.
+
+For a host with GCC and GNU ld, the userland can also be built with:
+
+```
+make -C user TOOLCHAIN=gnu
+```
+
+Full-system builds retain Aster's original external boot dependencies
+(Limine, protocol headers and freestanding headers/runtime). They require
+host image-building tools and QEMU to boot. No replacements for these
+components were added by the Nano integration.
+
+The integrated image was built with Clang/LLD 19 and booted in QEMU 10
+with BIOS firmware, AHCI/ext2 and 512 MiB RAM. Manual shell interaction
+compiled `/root/hello.c` with `ncc`, ran the resulting executable, and
+repeated compilation and linking separately with `ncc -c` and `nld`.
+Both executables printed `Hello from Nano on Aster` inside the guest.
+The ELF loader accepts empty load segments emitted by GNU ld.

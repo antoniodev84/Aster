@@ -124,7 +124,9 @@ long initrd_extract(const void *data, size_t size) {
                 if (e < 0)
                     return e;
             } else if ((h[156] == '0' || h[156] == 0) &&
-                       (!kstrncmp(relative, "bin/", 4) || !kstrncmp(relative, "sbin/", 5))) {
+                       (!kstrncmp(relative, "bin/", 4) || !kstrncmp(relative, "sbin/", 5) ||
+                        !kstrncmp(relative, "usr/include/", 12) ||
+                        !kstrncmp(relative, "usr/lib/", 8))) {
                 if (!S_ISREG(existing->mode))
                     return -EINVAL;
                 uint32_t target_mode = S_IFREG | (mode & 07777);

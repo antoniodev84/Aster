@@ -49,7 +49,7 @@ long elf_load(const char *path, char *const argv[], char *const envp[], struct a
             e = -ENOEXEC;
             goto fail;
         }
-        if (segment.align > 1 && ((segment.align & (segment.align - 1)) ||
+        if (segment.memsz && segment.align > 1 && ((segment.align & (segment.align - 1)) ||
                                   ((segment.vaddr - segment.offset) & (segment.align - 1)))) {
             e = -ENOEXEC;
             goto fail;
