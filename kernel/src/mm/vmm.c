@@ -161,10 +161,22 @@ void vmm_destroy(struct address_space *space) {
                 for (struct file_page *cache = page->file->pages; cache; cache = cache->next)
                     if (cache->physical == page->physical)
                         cache->dirty = true;
+        }
+    for (struct vm_page *page = space->pages; page; page = page->next) {
+        if (!page->file || !(page->flags & VM_SHARED))
+            continue;
+        bool seen = false;
+        for (struct vm_page *prior = space->pages; prior != page; prior = prior->next)
+            if (prior->file == page->file && (prior->flags & VM_SHARED)) {
+                seen = true;
+                break;
+            }
+        if (!seen) {
             long e = file_cache_flush(page->file);
             if (e < 0)
                 kprintf("[vmm] exit flush failed: %ld\n", e);
         }
+    }
     unmap_pages(space, 0, USER_TOP, false);
     uint64_t *root = physical_pointer(space->root);
     for (unsigned i = 0; i < 256; i++)

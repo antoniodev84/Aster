@@ -1,5 +1,6 @@
 #include "net/net.h"
 #include "vfs.h"
+#include "console/framebuffer.h"
 #include "mm/mm.h"
 #include "kstring.h"
 #include "proc/process.h"
@@ -604,7 +605,8 @@ long vfs_write(struct vnode *n, uint64_t off, const void *b, size_t count) {
                 memcpy((uint8_t *)physical_pointer(p->physical) + a - p->offset,
                        (const uint8_t *)b + a - off, z - a);
         }
-        vmm_file_resize(n);
+        if (S_ISREG(n->mode))
+            vmm_file_resize(n);
     }
     return result;
 }
@@ -692,6 +694,10 @@ long vfs_getcwd(struct vnode *node, char *buffer, size_t size) {
 struct open_file *file_new(struct vnode *n, unsigned flags) {
     struct open_file *f = kcalloc(1, sizeof(*f));
     if (f) {
+        if (n && n->device == 4 && !framebuffer_acquire()) {
+            kfree(f);
+            return NULL;
+        }
         f->references = 1;
         f->node = n;
         f->flags = flags;
@@ -719,6 +725,8 @@ long file_release(struct open_file *f) {
             kfree(f->pipe);
     }
     if (f->node) {
+        if (f->node->device == 4)
+            framebuffer_release();
         result = file_cache_flush(f->node);
         vnode_release(f->node);
     }

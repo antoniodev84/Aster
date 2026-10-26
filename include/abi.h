@@ -228,6 +228,22 @@
 #define WIFSTOPPED(s) (((s) & 255) == 127)
 #define WSTOPSIG(s) (((s) >> 8) & 255)
 
+#define FB_GETINFO 0x4600
+struct abi_fbinfo {
+    uint32_t width, height, pitch, bpp;
+    uint8_t red_size, red_shift, green_size, green_shift, blue_size, blue_shift;
+    uint8_t reserved[2];
+};
+struct abi_mouse_event {
+    int16_t dx, dy;
+    uint8_t buttons, reserved;
+};
+struct abi_key_event {
+    uint16_t code;
+    uint8_t pressed;
+    char character;
+};
+
 #define TCGETS 0x5401
 #define TCSETS 0x5402
 #define TCSETSW 0x5403

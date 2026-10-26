@@ -1,4 +1,6 @@
 #include "vfs.h"
+#include "console/framebuffer.h"
+#include "drivers/ps2.h"
 #include "mm/mm.h"
 #include "proc/process.h"
 #include "drivers/tty.h"
@@ -17,6 +19,46 @@ static struct vnode *make(struct vnode *p, const char *name, uint32_t mode) {
     return n;
 }
 static long dev_read(struct vnode *n, uint64_t off, void *b, size_t count) {
+    if (n->device == 4) {
+        const struct framebuffer_info *f = framebuffer_get();
+        if (!f)
+            return -ENODEV;
+        size_t size = f->pitch * f->height;
+        if (off >= size)
+            return 0;
+        if (count > size - off)
+            count = size - off;
+        memcpy(b, (uint8_t *)f->address + off, count);
+        return count;
+    }
+    if (n->device == 5) {
+        if (!ps2_get_status().mouse)
+            return -ENODEV;
+        if (count < sizeof(struct abi_mouse_event))
+            return -EINVAL;
+        size_t done = 0;
+        struct ps2_mouse_event e;
+        while (count - done >= sizeof(struct abi_mouse_event) && ps2_read_mouse(&e)) {
+            struct abi_mouse_event event = {e.dx, e.dy, e.buttons, 0};
+            memcpy((uint8_t *)b + done, &event, sizeof(event));
+            done += sizeof(event);
+        }
+        return done ? (long)done : -EAGAIN;
+    }
+    if (n->device == 6) {
+        if (!ps2_get_status().keyboard)
+            return -ENODEV;
+        if (count < sizeof(struct abi_key_event))
+            return -EINVAL;
+        size_t done = 0;
+        struct ps2_key_event e;
+        while (count - done >= sizeof(struct abi_key_event) && ps2_read_key(&e)) {
+            struct abi_key_event event = {e.code, e.pressed, e.character};
+            memcpy((uint8_t *)b + done, &event, sizeof(event));
+            done += sizeof(event);
+        }
+        return done ? (long)done : -EAGAIN;
+    }
     if (n->device == 1)
         return tty_read(b, count);
     if (n->device == 2)
@@ -47,6 +89,18 @@ static long dev_read(struct vnode *n, uint64_t off, void *b, size_t count) {
     return -ENODEV;
 }
 static long dev_write(struct vnode *n, uint64_t off, const void *b, size_t count) {
+    if (n->device == 4) {
+        const struct framebuffer_info *f = framebuffer_get();
+        if (!f)
+            return -ENODEV;
+        size_t size = f->pitch * f->height;
+        if (off >= size)
+            return -ENOSPC;
+        if (count > size - off)
+            count = size - off;
+        memcpy((uint8_t *)f->address + off, b, count);
+        return count;
+    }
     if (n->device == 1)
         return tty_write(b, count);
     if (n->device == 2 || n->device == 3)
@@ -241,15 +295,21 @@ void pseudo_init(void) {
     dev_root->mount_id = 2;
     proc_root->mount_id = 3;
     sys_root->mount_id = 4;
-    const char *names[] = {"console", "tty", "null", "zero"};
-    unsigned device_numbers[] = {1, 1, 2, 3};
-    for (unsigned i = 0; i < 4; i++) {
+    const char *names[] = {"console", "tty", "null", "zero", "fb0", "mouse0", "kbd0"};
+    unsigned device_numbers[] = {1, 1, 2, 3, 4, 5, 6};
+    for (unsigned i = 0; i < 7; i++) {
         struct vnode *n = make(dev_root, names[i], S_IFCHR | 0666);
         if (!n)
             hal_panic("device node allocation failed");
         n->device = device_numbers[i];
+        if (n->device >= 4)
+            n->mode = S_IFCHR | 0600;
+        if (n->device == 4 && framebuffer_get())
+            n->size = framebuffer_get()->pitch * framebuffer_get()->height;
         n->ops = &device_ops;
     }
+    if (!make(dev_root, "shm", S_IFDIR | 01777))
+        hal_panic("shared memory directory allocation failed");
     for (size_t i = 0; i < block_device_count; i++) {
         struct vnode *n = make(dev_root, block_devices[i].name, S_IFBLK | 0600);
         if (!n)

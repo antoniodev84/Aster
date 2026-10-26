@@ -13,6 +13,10 @@ struct framebuffer_info {
     uint8_t blue_size, blue_shift;
 };
 
+bool framebuffer_acquire(void);
+void framebuffer_release(void);
+bool framebuffer_owned(void);
+const struct framebuffer_info *framebuffer_get(void);
 bool framebuffer_console_init(const struct framebuffer_info *info);
 void framebuffer_console_dimensions(size_t *columns, size_t *rows);
 void framebuffer_console_putc(char c);

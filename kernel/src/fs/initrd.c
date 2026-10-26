@@ -125,14 +125,15 @@ long initrd_extract(const void *data, size_t size) {
                     return e;
             } else if ((h[156] == '0' || h[156] == 0) &&
                        (!kstrncmp(relative, "bin/", 4) || !kstrncmp(relative, "sbin/", 5) ||
+                        !kstrncmp(relative, "usr/apps/bin/", 13) ||
                         !kstrncmp(relative, "usr/include/", 12) ||
                         !kstrncmp(relative, "usr/lib/", 8))) {
                 if (!S_ISREG(existing->mode))
                     return -EINVAL;
                 uint32_t target_mode = S_IFREG | (mode & 07777);
                 bool data_same = same_content(existing, h + 512, length);
-                bool meta_same = existing->mode == target_mode && existing->uid == uid &&
-                                 existing->gid == gid;
+                bool meta_same =
+                    existing->mode == target_mode && existing->uid == uid && existing->gid == gid;
                 if (data_same && meta_same)
                     goto next_entry;
                 if (!data_same) {
@@ -153,7 +154,7 @@ long initrd_extract(const void *data, size_t size) {
                     return e;
             }
         }
-next_entry:
+    next_entry:
         uint64_t rounded = (length + 511) & ~511ull;
         if (rounded > SIZE_MAX - offset - 512)
             return -EINVAL;

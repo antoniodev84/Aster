@@ -49,7 +49,7 @@ initrd.tar: $(NANOBINS) root/usr/lib/crt0.o root/usr/lib/libc.a $(NANOHEADERS) r
 	mkdir -p root/dev root/proc root/sys root/tmp root/root root/etc root/mnt
 	chmod 755 root root/bin root/sbin root/etc root/dev root/proc root/sys root/mnt
 	chmod 700 root/root
-	chmod 644 root/etc/* root/root/*.txt
+	chmod 644 root/etc/*
 	chmod 755 root/bin/* root/sbin/*
 	chmod 1777 root/tmp
 	tar --format=ustar --owner=0 --group=0 -cf $@ -C root .
@@ -88,3 +88,29 @@ root/usr/include/stdarg.h root/usr/include/stddef.h: root/usr/include/%: nano/in
 $(filter-out root/usr/include/stdarg.h root/usr/include/stddef.h,$(NANOHEADERS)): root/usr/include/%: libc/include/%
 	mkdir -p $(@D)
 	cp $< $@
+
+GUISRC := $(wildcard apps/*.c)
+GUIAPPS := $(patsubst apps/%.c,root/usr/apps/bin/%,$(GUISRC))
+all: root/bin/asterwm $(GUIAPPS) root/usr/lib/libgui.a root/usr/include/gui.h
+build/gui/%.o: gui/%.c gui/gui.h gui/font.h ../include/abi.h
+	mkdir -p $(@D)
+	$(CC) $(CFLAGS) -Igui -c $< -o $@
+build/libgui.a: build/gui/gui.o
+	$(AR) rcs $@ $^
+root/bin/asterwm: build/gui/asterwm.o build/libgui.a build/libc.a linker.ld
+	mkdir -p $(@D)
+	$(LD) $(LDFLAGS) build/libc/start.o $< build/libgui.a build/libc.a -o $@
+	chmod 755 $@
+root/usr/apps/bin/%: apps/%.c build/libgui.a build/libc.a gui/gui.h linker.ld
+	mkdir -p $(@D)
+	$(CC) $(CFLAGS) -Igui -c $< -o $@.o
+	$(LD) $(LDFLAGS) build/libc/start.o $@.o build/libgui.a build/libc.a -o $@
+	rm -- $@.o
+	chmod 755 $@
+root/usr/lib/libgui.a: build/libgui.a
+	mkdir -p $(@D)
+	cp $< $@
+root/usr/include/gui.h: gui/gui.h
+	mkdir -p $(@D)
+	cp $< $@
+initrd.tar: root/bin/asterwm $(GUIAPPS) root/usr/lib/libgui.a root/usr/include/gui.h

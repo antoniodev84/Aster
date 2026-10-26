@@ -55,7 +55,7 @@ static void echo(uint8_t c) {
 }
 static void receive(uint8_t c) {
     if (c >= 128) {
-        return; 
+        return;
     }
 
     if ((attributes.c_iflag & ICRNL) && c == '\r')
@@ -125,6 +125,8 @@ void tty_poll(void) {
         return;
     for (unsigned i = 0; i < 256 && (hal_io_read8(0x3fd) & 1); i++)
         receive(hal_io_read8(0x3f8));
+    if (framebuffer_owned())
+        return;
     struct ps2_key_event key;
     while (ps2_read_key(&key)) {
         if (key.code == 0x14 || key.code == 0x114) {
@@ -168,7 +170,6 @@ long tty_read(void *buffer, size_t count) {
     if (p && p->pgrp != foreground) {
         process_signal(p, SIGTTIN);
         return -EINTR;
-
     }
     if (!count)
         return 0;

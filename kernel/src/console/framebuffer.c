@@ -8,7 +8,22 @@
 static struct framebuffer_info fb;
 static size_t column, row, columns, rows;
 static uint32_t foreground, background;
-static bool ready;
+static bool ready, owned;
+bool framebuffer_acquire(void) {
+    if (!ready || owned)
+        return false;
+    owned = true;
+    return true;
+}
+void framebuffer_release(void) {
+    owned = false;
+}
+bool framebuffer_owned(void) {
+    return owned;
+}
+const struct framebuffer_info *framebuffer_get(void) {
+    return ready ? &fb : NULL;
+}
 static unsigned escape_state, parameters[8], parameter_count;
 static size_t saved_row, saved_column;
 static bool inverse;
@@ -200,6 +215,8 @@ static void csi(char c) {
         column = columns - 1;
 }
 void framebuffer_console_putc(char c) {
+    if (owned)
+        return;
     if (!ready)
         return;
     if (escape_state == 1) {

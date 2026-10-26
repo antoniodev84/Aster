@@ -1,4 +1,5 @@
 #include "ps2.h"
+#include "proc/process.h"
 #include "hal/hal.h"
 #include "console/kprintf.h"
 
@@ -82,28 +83,27 @@ static bool config_write(uint8_t value) {
 
 static char key_character(uint8_t code, bool shift) {
     static const char normal[128] = {
-        [0x1c] = 'a',  [0x32] = 'b',  [0x21] = 'c',  [0x23] = 'd', [0x24] = 'e',
-        [0x2b] = 'f',  [0x34] = 'g',  [0x33] = 'h',  [0x43] = 'i', [0x3b] = 'j',
-        [0x42] = 'k',  [0x4b] = 'l',  [0x3a] = 'm',  [0x31] = 'n', [0x44] = 'o',
-        [0x4d] = 'p',  [0x15] = 'q',  [0x2d] = 'r',  [0x1b] = 's', [0x2c] = 't',
-        [0x3c] = 'u',  [0x2a] = 'v',  [0x1d] = 'w',  [0x22] = 'x', [0x35] = 'y',
-        [0x1a] = 'z',  [0x16] = '1',  [0x1e] = '2',  [0x26] = '3', [0x25] = '4',
-        [0x2e] = '5',  [0x36] = '6',  [0x3d] = '7',  [0x3e] = '8', [0x46] = '9',
-        [0x45] = '0',  [0x0e] = '`',  [0x4e] = '-',  [0x55] = '=', [0x54] = '[',
-        [0x5b] = ']',  [0x5d] = '\\', [0x4c] = ';',  [0x52] = '\'',[0x41] = ',',
-        [0x49] = '.',  [0x4a] = '/',  [0x29] = ' ',  [0x5a] = '\n',[0x66] = '\b',
-        [0x0d] = '\t', [0x76] = 27,
+        [0x1c] = 'a',  [0x32] = 'b',  [0x21] = 'c',  [0x23] = 'd', [0x24] = 'e', [0x2b] = 'f',
+        [0x34] = 'g',  [0x33] = 'h',  [0x43] = 'i',  [0x3b] = 'j', [0x42] = 'k', [0x4b] = 'l',
+        [0x3a] = 'm',  [0x31] = 'n',  [0x44] = 'o',  [0x4d] = 'p', [0x15] = 'q', [0x2d] = 'r',
+        [0x1b] = 's',  [0x2c] = 't',  [0x3c] = 'u',  [0x2a] = 'v', [0x1d] = 'w', [0x22] = 'x',
+        [0x35] = 'y',  [0x1a] = 'z',  [0x16] = '1',  [0x1e] = '2', [0x26] = '3', [0x25] = '4',
+        [0x2e] = '5',  [0x36] = '6',  [0x3d] = '7',  [0x3e] = '8', [0x46] = '9', [0x45] = '0',
+        [0x0e] = '`',  [0x4e] = '-',  [0x55] = '=',  [0x54] = '[', [0x5b] = ']', [0x5d] = '\\',
+        [0x4c] = ';',  [0x52] = '\'', [0x41] = ',',  [0x49] = '.', [0x4a] = '/', [0x29] = ' ',
+        [0x5a] = '\n', [0x66] = '\b', [0x0d] = '\t', [0x76] = 27,
     };
     static const char shifted[128] = {
-        [0x16] = '!', [0x1e] = '@', [0x26] = '#', [0x25] = '$', [0x2e] = '%',
-        [0x36] = '^', [0x3d] = '&', [0x3e] = '*', [0x46] = '(', [0x45] = ')',
-        [0x0e] = '~', [0x4e] = '_', [0x55] = '+', [0x54] = '{', [0x5b] = '}',
-        [0x5d] = '|', [0x4c] = ':', [0x52] = '"', [0x41] = '<', [0x49] = '>',
-        [0x4a] = '?',
+        [0x16] = '!', [0x1e] = '@', [0x26] = '#', [0x25] = '$', [0x2e] = '%', [0x36] = '^',
+        [0x3d] = '&', [0x3e] = '*', [0x46] = '(', [0x45] = ')', [0x0e] = '~', [0x4e] = '_',
+        [0x55] = '+', [0x54] = '{', [0x5b] = '}', [0x5d] = '|', [0x4c] = ':', [0x52] = '"',
+        [0x41] = '<', [0x49] = '>', [0x4a] = '?',
     };
-    if (code >= 128) return 0;
+    if (code >= 128)
+        return 0;
     char c = normal[code];
-    if (c >= 'a' && c <= 'z') return shift != caps ? c - 'a' + 'A' : c;
+    if (c >= 'a' && c <= 'z')
+        return shift != caps ? c - 'a' + 'A' : c;
     return shift && shifted[code] ? shifted[code] : c;
 }
 
@@ -115,6 +115,7 @@ static void enqueue_key(uint16_t code, bool pressed, char character) {
     }
     keys[key_head] = (struct ps2_key_event){code, pressed, character};
     key_head = next;
+    process_wake_io();
 }
 
 static void keyboard_byte(uint8_t byte) {
@@ -158,16 +159,21 @@ static void keyboard_byte(uint8_t byte) {
     }
 
     if (!extended) {
-        if (make == 0x12) left_shift = down;
-        if (make == 0x59) right_shift = down;
+        if (make == 0x12)
+            left_shift = down;
+        if (make == 0x59)
+            right_shift = down;
         if (make == 0x58) {
-            if (down && !caps_down) caps = !caps;
+            if (down && !caps_down)
+                caps = !caps;
             caps_down = down;
         }
     }
     char c = down && !extended ? key_character(make, left_shift || right_shift) : 0;
-    if (down && extended && make == 0x5a) c = '\n';
-    if (down && extended && make == 0x4a) c = '/';
+    if (down && extended && make == 0x5a)
+        c = '\n';
+    if (down && extended && make == 0x4a)
+        c = '/';
     enqueue_key(code, down, c);
     extended = false;
 }
@@ -194,6 +200,7 @@ static void mouse_byte(uint8_t byte) {
     int16_t dy = (int16_t)mouse_packet[2] - ((mouse_packet[0] & 0x20) ? 256 : 0);
     mice[mouse_head] = (struct ps2_mouse_event){dx, -dy, mouse_packet[0] & 7};
     mouse_head = next;
+    process_wake_io();
 }
 
 static bool ps2_interrupt(void *context) {
@@ -276,8 +283,7 @@ struct ps2_status ps2_init(void) {
     status.errors = 0;
 
     kprintf("[ps2] keyboard=%s set=2 mouse=%s packet=3 IRQ1/IRQ12 via IOAPIC\n",
-            status.keyboard ? "ready" : "absent/failed",
-            status.mouse ? "ready" : "absent/failed");
+            status.keyboard ? "ready" : "absent/failed", status.mouse ? "ready" : "absent/failed");
     hal_irq_restore(state);
     return status;
 

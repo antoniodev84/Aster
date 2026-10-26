@@ -1,5 +1,6 @@
 #include "net/net.h"
 #include "process.h"
+#include "console/framebuffer.h"
 #include "drivers/tty.h"
 #include "kstring.h"
 #include "console/kprintf.h"
@@ -55,6 +56,8 @@ static long open_path(int dirfd, uint64_t path_u, unsigned flags, uint32_t mode)
         return -EEXIST;
     if (e < 0)
         return e;
+    if (node->device == 4 && (!framebuffer_get() || framebuffer_owned()))
+        return framebuffer_get() ? -EBUSY : -ENODEV;
     if (S_ISLNK(node->mode))
         return -ELOOP;
     if ((flags & O_DIRECTORY) && !S_ISDIR(node->mode))
@@ -485,6 +488,23 @@ static long ioctl_user(int fd, uint64_t request, uint64_t pointer) {
     struct open_file *f = get_file(fd);
     if (!f)
         return -EBADF;
+    if (f->node && f->node->device == 4 && request == FB_GETINFO) {
+        const struct framebuffer_info *info = framebuffer_get();
+        if (!info)
+            return -ENODEV;
+        struct abi_fbinfo result = {info->width,
+                                    info->height,
+                                    info->pitch,
+                                    32,
+                                    info->red_size,
+                                    info->red_shift,
+                                    info->green_size,
+                                    info->green_shift,
+                                    info->blue_size,
+                                    info->blue_shift,
+                                    {0, 0}};
+        return copy_to_user(p->space, pointer, &result, sizeof(result)) ? 0 : -EFAULT;
+    }
     if (f->pipe || !f->node || f->node->device != 1)
         return -ENOTTY;
     size_t size;
@@ -553,10 +573,21 @@ static long sys_dispatch(struct x64_frame *f) {
     struct process *p = process_current();
     uint64_t a = f->rdi, b = f->rsi, c = f->rdx, d = f->r10, e = f->r8, g = f->r9;
     switch (f->rax) {
-    case SYS_socket: case SYS_connect: case SYS_accept: case SYS_sendto:
-    case SYS_recvfrom: case SYS_shutdown: case SYS_bind: case SYS_listen:
-    case SYS_getsockname: case SYS_getpeername: case SYS_setsockopt:
-    case SYS_getsockopt: case SYS_netconfig: case SYS_resolve: case SYS_dhcp:
+    case SYS_socket:
+    case SYS_connect:
+    case SYS_accept:
+    case SYS_sendto:
+    case SYS_recvfrom:
+    case SYS_shutdown:
+    case SYS_bind:
+    case SYS_listen:
+    case SYS_getsockname:
+    case SYS_getpeername:
+    case SYS_setsockopt:
+    case SYS_getsockopt:
+    case SYS_netconfig:
+    case SYS_resolve:
+    case SYS_dhcp:
         return net_syscall(f->rax, a, b, c, d, e, g);
     case SYS_read:
         return io_file(a, b, c, false);
@@ -596,7 +627,7 @@ static long sys_dispatch(struct x64_frame *f) {
         struct open_file *file = get_file(a);
         if (!file)
             return -EBADF;
-        if (!file->node || file->pipe || S_ISCHR(file->node->mode))
+        if (!file->node || file->pipe || (S_ISCHR(file->node->mode) && file->node->device != 4))
             return -ESPIPE;
         int64_t offset = b, base = c == SEEK_SET   ? 0
                                    : c == SEEK_CUR ? file->offset
